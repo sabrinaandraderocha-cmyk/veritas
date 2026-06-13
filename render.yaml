@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: veritas-app
+    runtime: docker
+    plan: free
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: SERPAPI_KEY
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
