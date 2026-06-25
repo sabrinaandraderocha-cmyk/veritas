@@ -378,21 +378,30 @@ if not st.session_state.onboarding_completed:
     onboarding_html = (
         "<div class='card'>"
         "<h3>Bem-vinda(o) ao Veritas</h3>"
+
         "<p>"
-        "O Veritas é uma ferramenta de apoio à leitura acadêmica, "
-        "à análise de similaridade textual e à observação de padrões linguísticos."
+        "O Veritas ajuda você a revisar textos acadêmicos com mais segurança."
         "</p>"
+
         "<p>"
-        "Ele <b>não determina plágio</b>, <b>não comprova originalidade</b> "
-        "e <b>não afirma se um texto foi produzido por inteligência artificial</b>."
+        "A plataforma realiza uma triagem inteligente do documento, comparando trechos "
+        "com uma biblioteca de referência, consultando correspondências preliminares na web "
+        "e analisando padrões linguísticos que podem sugerir necessidade de revisão."
         "</p>"
+
         "<p>"
-        "Os resultados devem sempre ser interpretados por uma pessoa, "
-        "considerando o contexto, a finalidade do texto e os critérios acadêmicos aplicáveis."
+        "Com isso, o Veritas aponta pontos de atenção, trechos semelhantes, possíveis fontes "
+        "relacionadas e indicadores úteis para apoiar decisões acadêmicas, pedagógicas e institucionais."
         "</p>"
+
         "<p>"
-        "Evite enviar documentos com dados pessoais, clínicos, sigilosos "
-        "ou sem autorização de uso."
+        "O relatório não é um julgamento automático. Um índice de similaridade ou um padrão "
+        "linguístico incomum não significa, por si só, plágio, fraude ou uso indevido de inteligência artificial."
+        "</p>"
+
+        "<p>"
+        "A análise final deve sempre considerar o contexto, as citações, as referências, "
+        "a finalidade do texto e os critérios da instituição."
         "</p>"
         "</div>"
     )
@@ -402,7 +411,7 @@ if not st.session_state.onboarding_completed:
     c1, c2, c3 = st.columns([1, 2, 1])
 
     with c2:
-        if st.button("Entendi e quero começar", type="primary", use_container_width=True):
+        if st.button("Começar análise", type="primary", use_container_width=True):
             st.session_state.onboarding_completed = True
             st.rerun()
 
