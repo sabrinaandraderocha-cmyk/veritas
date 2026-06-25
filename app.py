@@ -375,34 +375,29 @@ if not st.session_state.onboarding_completed:
 
     st.markdown("## Antes de começar")
 
-    st.markdown(
-        """
-        <div class='card'>
-            <h3>Bem-vinda(o) ao Veritas</h3>
-
-            <p>
-                O Veritas é uma ferramenta de apoio à leitura acadêmica,
-                à análise de similaridade textual e à observação de padrões linguísticos.
-            </p>
-
-            <p>
-                Ele <b>não determina plágio</b>, <b>não comprova originalidade</b>
-                e <b>não afirma se um texto foi produzido por inteligência artificial</b>.
-            </p>
-
-            <p>
-                Os resultados devem sempre ser interpretados por uma pessoa,
-                considerando o contexto, a finalidade do texto e os critérios acadêmicos aplicáveis.
-            </p>
-
-            <p>
-                Evite enviar documentos com dados pessoais, clínicos, sigilosos
-                ou sem autorização de uso.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    onboarding_html = (
+        "<div class='card'>"
+        "<h3>Bem-vinda(o) ao Veritas</h3>"
+        "<p>"
+        "O Veritas é uma ferramenta de apoio à leitura acadêmica, "
+        "à análise de similaridade textual e à observação de padrões linguísticos."
+        "</p>"
+        "<p>"
+        "Ele <b>não determina plágio</b>, <b>não comprova originalidade</b> "
+        "e <b>não afirma se um texto foi produzido por inteligência artificial</b>."
+        "</p>"
+        "<p>"
+        "Os resultados devem sempre ser interpretados por uma pessoa, "
+        "considerando o contexto, a finalidade do texto e os critérios acadêmicos aplicáveis."
+        "</p>"
+        "<p>"
+        "Evite enviar documentos com dados pessoais, clínicos, sigilosos "
+        "ou sem autorização de uso."
+        "</p>"
+        "</div>"
     )
+
+    st.markdown(onboarding_html, unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns([1, 2, 1])
 
