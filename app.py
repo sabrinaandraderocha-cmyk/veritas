@@ -455,6 +455,25 @@ with st.sidebar:
         index=list(PROFILES).index(st.session_state.profile),
     )
 
+    with st.expander("Entenda os perfis de comparação"):
+        st.markdown(
+            """
+            **Padrão (equilibrado)**  
+            Indicado para a maioria das análises. Equilibra precisão e sensibilidade.
+
+            **Rigoroso (correspondência literal)**  
+            Exige correspondências mais fortes e mais próximas do texto original.  
+            Pode mostrar menos resultados, mas tende a destacar semelhanças mais literais.
+
+            **Sensível (correspondência aproximada)**  
+            Busca mais possibilidades de semelhança.  
+            Pode encontrar mais pontos de atenção, mas também pode gerar mais falsos positivos.
+
+            Os perfis ajudam na triagem, mas não produzem uma conclusão automática de plágio,
+            fraude, originalidade ou autoria.
+            """
+        )
+
     st.caption("Os documentos da biblioteca permanecem somente durante a sessão atual.")
     st.divider()
     st.caption("Veritas © 2026")
