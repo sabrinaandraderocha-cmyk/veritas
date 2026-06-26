@@ -420,10 +420,21 @@ def inject_css():
             color: #64748b;
             font-size: .9rem;
           }
+
+          .field-help {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-top: -0.25rem;
+            margin-bottom: 0.7rem;
+          }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def field_help(text: str):
+    st.markdown(f"<div class='field-help'>{text}</div>", unsafe_allow_html=True)
 
 
 st.set_page_config(page_title=APP_TITLE, page_icon="🔎", layout="wide")
@@ -538,6 +549,10 @@ with st.sidebar:
         index=list(PROFILES).index(st.session_state.profile),
     )
 
+    field_help(
+        "Escolha como o Veritas deve procurar correspondências: equilibrado, mais literal ou mais sensível."
+    )
+
     with st.expander("Entenda os perfis de comparação"):
         st.markdown(
             """
@@ -574,17 +589,41 @@ def text_input_block(prefix: str):
     uploaded_text = ""
     uploaded_name = ""
 
+    help_texts = {
+        "local": {
+            "paste": "Cole aqui o texto que será comparado com os documentos adicionados à biblioteca.",
+            "upload": "Envie um PDF, DOCX ou TXT para extrair o texto e comparar com a biblioteca.",
+        },
+        "web": {
+            "paste": "Cole aqui o texto que terá fragmentos pesquisados na web.",
+            "upload": "Envie um arquivo para que o Veritas extraia trechos e busque possíveis correspondências online.",
+        },
+        "ling": {
+            "paste": "Cole aqui o texto para observar padrões de escrita, como diversidade lexical e repetição.",
+            "upload": "Envie um arquivo para análise exploratória de padrões linguísticos.",
+        },
+    }
+
     tab1, tab2 = st.tabs(["Colar texto", "Enviar arquivo"])
 
     with tab1:
+        field_help(help_texts.get(prefix, {}).get("paste", "Cole o texto a ser analisado."))
         pasted = st.text_area("Texto", height=260, key=f"{prefix}_paste")
 
+        if prefix == "web":
+            st.caption("A busca web pode enviar fragmentos do texto para consulta externa após sua confirmação.")
+        else:
+            st.caption("Evite inserir dados pessoais, clínicos, sigilosos ou documentos sem autorização.")
+
     with tab2:
+        field_help(help_texts.get(prefix, {}).get("upload", "Envie um arquivo para análise."))
         uploaded = st.file_uploader(
             "PDF, DOCX ou TXT",
             type=["pdf", "docx", "txt"],
             key=f"{prefix}_upload",
         )
+
+        st.caption("PDFs escaneados ou em imagem podem não ser lidos corretamente, pois podem exigir OCR.")
 
         if uploaded:
             try:
@@ -594,6 +633,9 @@ def text_input_block(prefix: str):
                 st.success(f"Texto extraído: {len(split_words(uploaded_text))} palavras.")
 
                 with st.expander("Conferir texto extraído"):
+                    st.caption(
+                        "Confira se a extração ficou adequada antes de usar o arquivo na análise."
+                    )
                     st.text_area(
                         "Pré-visualização",
                         uploaded_text[:12000],
@@ -610,6 +652,12 @@ def text_input_block(prefix: str):
 
 if selected == "Nova análise":
     st.subheader("Nova análise local")
+
+    st.info(
+        "Nesta área, você envia ou cola um texto para comparar com a biblioteca da sessão. "
+        "O Veritas mostra trechos semelhantes, fonte da correspondência e localização aproximada no texto."
+    )
+
     st.markdown(f"<div class='note'>{LOCAL_DISCLAIMER}</div>", unsafe_allow_html=True)
 
     left, right = st.columns([1, 1.15])
@@ -618,9 +666,13 @@ if selected == "Nova análise":
         text, name = text_input_block("local")
         profile = PROFILES[st.session_state.profile]
 
+        field_help(
+            "Clique no botão abaixo para comparar o texto enviado com os documentos adicionados na biblioteca."
+        )
+
         if st.button("Comparar com a biblioteca", type="primary", disabled=not text):
             if not st.session_state.library:
-                st.error("Adicione ao menos um documento à biblioteca.")
+                st.error("Adicione ao menos um documento à biblioteca antes de comparar.")
             else:
                 with st.spinner("Comparando os documentos..."):
                     similarity, matches = compute_matches(
@@ -744,15 +796,35 @@ elif selected == "Biblioteca":
     st.subheader("Biblioteca de comparação")
 
     st.info(
-        "Os arquivos permanecem apenas na sessão atual. "
-        "Não envie documentos sem autorização ou que contenham dados sensíveis desnecessários."
+        "Adicione aqui os documentos que servirão como base de comparação. "
+        "Nesta versão, a biblioteca é temporária e permanece apenas durante a sessão atual."
     )
+
+    with st.expander("Como funciona a biblioteca?"):
+        st.markdown(
+            """
+            A biblioteca é o conjunto de documentos contra os quais o texto analisado será comparado.
+
+            Exemplos de uso:
+            - comparar um artigo com trabalhos anteriores;
+            - verificar semelhanças entre versões de um texto;
+            - comparar documentos de uma turma ou disciplina;
+            - montar uma base temporária de referência.
+
+            Os arquivos adicionados aqui não ficam salvos permanentemente nesta versão.
+            """
+        )
 
     uploads = st.file_uploader(
         "Adicionar documentos",
         type=["pdf", "docx", "txt"],
         accept_multiple_files=True,
         key="library_upload",
+    )
+
+    st.caption(
+        "Você pode adicionar um ou mais documentos à biblioteca da sessão. "
+        "Eles serão usados apenas como base de comparação local."
     )
 
     if uploads and st.button("Adicionar à biblioteca", type="primary"):
@@ -780,6 +852,7 @@ elif selected == "Biblioteca":
 
         with c2:
             with st.popover("Visualizar"):
+                st.caption("Confira o texto extraído deste documento.")
                 st.text_area(
                     filename,
                     content[:15000],
@@ -795,6 +868,12 @@ elif selected == "Biblioteca":
 
 elif selected == "Busca web":
     st.subheader("Busca de correspondências na web")
+
+    st.info(
+        "A busca web consulta fragmentos do texto em mecanismos de busca. "
+        "Revise os trechos antes de prosseguir e não envie conteúdo sigiloso ou sem autorização."
+    )
+
     st.markdown(f"<div class='note'>{WEB_DISCLAIMER}</div>", unsafe_allow_html=True)
 
     text, name = text_input_block("web")
@@ -817,6 +896,11 @@ elif selected == "Busca web":
         min(8, max(1, max_possible or 8)),
     )
 
+    st.caption(
+        "Quanto maior o número de trechos, maior a cobertura estimada da busca, "
+        "mas o processamento pode demorar mais."
+    )
+
     preview = (
         build_chunks(
             text,
@@ -831,8 +915,8 @@ elif selected == "Busca web":
     if preview:
         with st.expander("Ver os trechos que serão pesquisados na internet"):
             st.caption(
-                "Para proteger a privacidade, o Veritas não envia o documento inteiro. "
-                "Abaixo estão apenas os trechos que poderão ser enviados ao mecanismo de busca."
+                "O Veritas não envia o documento inteiro. "
+                "Confira abaixo os fragmentos que poderão ser enviados ao mecanismo de busca."
             )
 
             for i, fragment in enumerate(preview, 1):
@@ -841,6 +925,10 @@ elif selected == "Busca web":
     consent = st.checkbox(
         "Revisei os trechos e confirmo que não contêm dados pessoais, clínicos, "
         "sigilosos ou conteúdo cuja transmissão não seja autorizada."
+    )
+
+    st.caption(
+        "Marque esta opção apenas depois de revisar os fragmentos acima."
     )
 
     if st.button("Pesquisar na web", type="primary", disabled=not (text and consent)):
@@ -907,9 +995,20 @@ elif selected == "Busca web":
 
 elif selected == "Padrões linguísticos":
     st.subheader("Análise exploratória de padrões linguísticos")
+
+    st.info(
+        "Esta análise observa características linguísticas do texto, como diversidade lexical, "
+        "tamanho das frases, repetição de expressões e uso de conectores. "
+        "Ela pode indicar pontos de atenção, mas não determina autoria, uso de IA ou fraude."
+    )
+
     st.markdown(f"<div class='note'>{LINGUISTIC_DISCLAIMER}</div>", unsafe_allow_html=True)
 
     text, name = text_input_block("ling")
+
+    field_help(
+        "Use este recurso como apoio à revisão textual, não como veredito automático sobre autoria."
+    )
 
     if st.button("Analisar padrões", type="primary", disabled=not text):
         analysis_result = analyze_linguistic_patterns(text)
@@ -961,10 +1060,16 @@ elif selected == "Padrões linguísticos":
 elif selected == "Relatórios":
     st.subheader("Relatórios")
 
+    st.info(
+        "Baixe os resultados das análises realizadas nesta sessão. "
+        "Os relatórios organizam os achados do Veritas para apoiar a leitura humana e a revisão acadêmica."
+    )
+
     c1, c2, c3 = st.columns(3)
 
     with c1:
         st.markdown("#### Comparação local")
+        st.caption("Gera PDF com similaridade, correspondências e mapa aproximado de trechos.")
         result = st.session_state.local_result
 
         if result:
@@ -992,6 +1097,7 @@ elif selected == "Relatórios":
 
     with c2:
         st.markdown("#### Busca web")
+        st.caption("Gera PDF com cobertura estimada e resultados preliminares encontrados na web.")
         result = st.session_state.web_result
 
         if result:
@@ -1018,6 +1124,7 @@ elif selected == "Relatórios":
 
     with c3:
         st.markdown("#### Padrões linguísticos")
+        st.caption("Gera PDF com indicadores e observações linguísticas do texto analisado.")
         data = st.session_state.ling_result
 
         if data:
@@ -1044,6 +1151,22 @@ elif selected == "Histórico":
         "Este histórico é temporário e funciona apenas durante a sessão atual. "
         "Ele salva somente os resultados construídos na plataforma, sem armazenar o texto completo enviado."
     )
+
+    with st.expander("O que o histórico registra?"):
+        st.markdown(
+            """
+            O histórico registra apenas informações resumidas da análise, como:
+
+            - tipo de análise realizada;
+            - nome do arquivo ou texto inserido;
+            - data e hora;
+            - percentual ou síntese do resultado;
+            - quantidade de correspondências;
+            - mapa aproximado de similaridade, quando houver.
+
+            Ele não salva o texto completo enviado pelo usuário.
+            """
+        )
 
     if not st.session_state.history:
         st.warning("Nenhuma análise foi registrada nesta sessão.")
