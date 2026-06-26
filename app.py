@@ -5,6 +5,7 @@ import math
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import requests
@@ -101,6 +102,87 @@ def build_chunks(text: str, chunk_words: int, stride_words: int, max_chunks: int
             break
 
     return list(dict.fromkeys(chunks))
+
+
+def locate_chunk_in_text(full_text: str, chunk: str, total_chunks: int = 0) -> Dict[str, str]:
+    """
+    Localiza de forma aproximada onde o trecho analisado aparece no texto completo.
+
+    Observação:
+    - Não identifica página do PDF.
+    - Usa contagem aproximada de palavras.
+    - Funciona melhor porque os trechos analisados são criados a partir das palavras do próprio texto.
+    """
+    words = split_words(full_text)
+    chunk_words = split_words(chunk)
+
+    if not words or not chunk_words:
+        return {
+            "word_range": "Local não identificado",
+            "chunk_position": "Trecho não identificado",
+            "percent_range": "Posição não identificada",
+        }
+
+    found_start = None
+    max_start = len(words) - len(chunk_words)
+
+    if max_start >= 0:
+        for index in range(max_start + 1):
+            if words[index:index + len(chunk_words)] == chunk_words:
+                found_start = index
+                break
+
+    if found_start is None:
+        anchor = chunk_words[: min(8, len(chunk_words))]
+        max_anchor_start = len(words) - len(anchor)
+
+        if max_anchor_start >= 0 and anchor:
+            for index in range(max_anchor_start + 1):
+                if words[index:index + len(anchor)] == anchor:
+                    found_start = index
+                    break
+
+    if found_start is None:
+        return {
+            "word_range": "Local aproximado não encontrado",
+            "chunk_position": "Trecho aproximado não identificado",
+            "percent_range": "Posição não identificada",
+        }
+
+    start_word = found_start + 1
+    end_word = min(found_start + len(chunk_words), len(words))
+
+    start_percent = start_word / len(words) * 100
+    end_percent = end_word / len(words) * 100
+
+    if total_chunks and total_chunks > 0:
+        midpoint = (start_word + end_word) / 2
+        chunk_number = max(1, min(total_chunks, math.ceil((midpoint / len(words)) * total_chunks)))
+        chunk_position = f"Trecho aproximado {chunk_number} de {total_chunks}"
+    else:
+        chunk_position = "Trecho aproximado não calculado"
+
+    return {
+        "word_range": f"Palavras {start_word} a {end_word}",
+        "chunk_position": chunk_position,
+        "percent_range": f"Posição aproximada: {start_percent:.1f}% a {end_percent:.1f}% do texto",
+    }
+
+
+def add_history_item(kind: str, title: str, summary: str, details: Dict):
+    """
+    Salva no histórico apenas o resultado construído na plataforma.
+    Não salva o texto completo enviado pelo usuário.
+    """
+    item = {
+        "kind": kind,
+        "title": title,
+        "summary": summary,
+        "details": details,
+        "created_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    }
+
+    st.session_state.history.insert(0, item)
 
 
 def read_uploaded_file(uploaded_file) -> str:
@@ -352,6 +434,7 @@ for key, default in {
     "local_result": None,
     "web_result": None,
     "ling_result": None,
+    "history": [],
     "profile": "Padrão (equilibrado)",
 }.items():
     if key not in st.session_state:
@@ -360,8 +443,6 @@ for key, default in {
 
 # ==========================================================
 # ONBOARDING INICIAL
-# Esta etapa é segura: não usa banco de dados, não altera análises
-# e aparece apenas na sessão atual do navegador.
 # ==========================================================
 
 if "onboarding_completed" not in st.session_state:
@@ -435,6 +516,7 @@ selected = option_menu(
         "Busca web",
         "Padrões linguísticos",
         "Relatórios",
+        "Histórico",
     ],
     icons=[
         "search",
@@ -442,6 +524,7 @@ selected = option_menu(
         "globe",
         "body-text",
         "file-earmark-pdf",
+        "clock-history",
     ],
     orientation="horizontal",
 )
@@ -475,7 +558,14 @@ with st.sidebar:
         )
 
     st.caption("Os documentos da biblioteca permanecem somente durante a sessão atual.")
+    st.caption("O histórico atual também é temporário e não salva o texto completo enviado.")
     st.divider()
+
+    if st.session_state.history:
+        if st.button("Limpar histórico da sessão"):
+            st.session_state.history = []
+            st.rerun()
+
     st.caption("Veritas © 2026")
 
 
@@ -552,7 +642,30 @@ if selected == "Nova análise":
                         "matches": matches,
                         "total_chunks": total_chunks,
                         "documents": len(st.session_state.library),
+                        "profile": st.session_state.profile,
                     }
+
+                    map_summary = []
+
+                    for index, match in enumerate(matches[:5], 1):
+                        location = locate_chunk_in_text(text, match.query_chunk, total_chunks)
+                        map_summary.append(
+                            f"{index}. {match.score * 100:.1f}% — {match.source_doc} — "
+                            f"{location['word_range']} ({location['chunk_position']})"
+                        )
+
+                    add_history_item(
+                        kind="Comparação local",
+                        title=name,
+                        summary=f"Similaridade aproximada: {similarity * 100:.1f}%",
+                        details={
+                            "Trechos avaliados": total_chunks,
+                            "Documentos na biblioteca": len(st.session_state.library),
+                            "Correspondências": len(matches),
+                            "Perfil utilizado": st.session_state.profile,
+                            "Mapa de similaridade": map_summary or ["Nenhuma correspondência registrada no mapa."],
+                        },
+                    )
 
     with right:
         result = st.session_state.local_result
@@ -591,13 +704,40 @@ if selected == "Nova análise":
                 "sem concluir plágio ou originalidade."
             )
 
-            for match in result["matches"]:
-                with st.expander(f"{match.score * 100:.1f}% — {match.source_doc}"):
-                    st.markdown("**Trecho analisado**")
-                    st.write(match.query_chunk)
+            if result["matches"]:
+                st.markdown("#### Mapa de similaridade")
+                st.caption(
+                    "A localização é aproximada por contagem de palavras. "
+                    "O Veritas ainda não identifica página ou linha do PDF."
+                )
 
-                    st.markdown("**Trecho da fonte**")
-                    st.write(match.source_chunk)
+                for index, match in enumerate(result["matches"], 1):
+                    location = locate_chunk_in_text(
+                        result["text"],
+                        match.query_chunk,
+                        result["total_chunks"],
+                    )
+
+                    title = (
+                        f"Correspondência {index}: {match.score * 100:.1f}% — "
+                        f"{match.source_doc} — {location['chunk_position']}"
+                    )
+
+                    with st.expander(title):
+                        st.markdown("**Local aproximado no texto analisado**")
+                        st.write(f"• {location['word_range']}")
+                        st.write(f"• {location['percent_range']}")
+
+                        st.markdown("**Trecho analisado**")
+                        st.write(match.query_chunk)
+
+                        st.markdown("**Trecho da fonte**")
+                        st.write(match.source_chunk)
+
+                        st.markdown("**Fonte da correspondência**")
+                        st.write(match.source_doc)
+            else:
+                st.info("Nenhuma correspondência foi localizada para montar o mapa de similaridade.")
 
 
 elif selected == "Biblioteca":
@@ -719,6 +859,18 @@ elif selected == "Busca web":
                     "possible": max_possible,
                 }
 
+                add_history_item(
+                    kind="Busca web",
+                    title=name,
+                    summary=f"{len(hits)} resultado(s) relevante(s) localizado(s) nas prévias consultadas.",
+                    details={
+                        "Trechos pesquisados": searched,
+                        "Trechos possíveis": max_possible,
+                        "Cobertura estimada": f"{(searched / max_possible * 100) if max_possible else 0:.1f}%",
+                        "Perfil utilizado": st.session_state.profile,
+                    },
+                )
+
             except Exception as exc:
                 st.error(f"A busca não pôde ser concluída: {exc}")
 
@@ -760,10 +912,22 @@ elif selected == "Padrões linguísticos":
     text, name = text_input_block("ling")
 
     if st.button("Analisar padrões", type="primary", disabled=not text):
+        analysis_result = analyze_linguistic_patterns(text)
+
         st.session_state.ling_result = {
             "name": name,
-            "result": analyze_linguistic_patterns(text),
+            "result": analysis_result,
         }
+
+        add_history_item(
+            kind="Padrões linguísticos",
+            title=name,
+            summary=analysis_result["summary"],
+            details={
+                "Indicadores": analysis_result["display_metrics"],
+                "Observações": analysis_result["observations"] or ["Nenhuma observação relevante."],
+            },
+        )
 
     data = st.session_state.ling_result
 
@@ -871,3 +1035,37 @@ elif selected == "Relatórios":
             )
         else:
             st.caption("Nenhuma análise disponível.")
+
+
+elif selected == "Histórico":
+    st.subheader("Histórico da sessão")
+
+    st.info(
+        "Este histórico é temporário e funciona apenas durante a sessão atual. "
+        "Ele salva somente os resultados construídos na plataforma, sem armazenar o texto completo enviado."
+    )
+
+    if not st.session_state.history:
+        st.warning("Nenhuma análise foi registrada nesta sessão.")
+    else:
+        st.caption(f"{len(st.session_state.history)} registro(s) nesta sessão.")
+
+        for index, item in enumerate(st.session_state.history, 1):
+            with st.expander(f"{index}. {item['kind']} — {item['title']} — {item['created_at']}"):
+                st.markdown(f"**Tipo:** {item['kind']}")
+                st.markdown(f"**Arquivo/texto:** {item['title']}")
+                st.markdown(f"**Resumo:** {item['summary']}")
+
+                st.markdown("**Detalhes registrados:**")
+
+                for key, value in item["details"].items():
+                    if isinstance(value, dict):
+                        st.markdown(f"**{key}:**")
+                        for sub_key, sub_value in value.items():
+                            st.write(f"• {sub_key}: {sub_value}")
+                    elif isinstance(value, list):
+                        st.markdown(f"**{key}:**")
+                        for sub_value in value:
+                            st.write(f"• {sub_value}")
+                    else:
+                        st.write(f"• {key}: {value}")
